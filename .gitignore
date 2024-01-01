@@ -1,0 +1,8 @@
+images/crawled/*
+*.db
+WebServer/Blog/static/*
+**/__pycache__/
+*.sqlite3
+.cemotion_cache
+/*.html
+/*.pdf

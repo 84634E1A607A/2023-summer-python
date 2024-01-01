@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mdui-container mdui-row">
+  {% if is_search %}
+  <div class="mdui-col-xs-12" style="margin: 30px;">
+    搜索用时 {{ search_time }} ms, 共 {{ news_count }} 条结果
+  </div>
+  {% endif %}
+  <div class="mdui-col-xs-12" style="margin-bottom: 30px;">
+    {% for news_item in news_items %}
+    {% include 'newsCard.html' %}
+    {% endfor %}
+  </div>
+  <div class="mdui-col-xs-8" style="margin-top: 15px;">
+    <div class="mdui-textfield mdui-text-center">
+      <a href="{% url 'list' %}?search={{ is_search }}&news_category={{ news_category }}&page_index=1" class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme">首页</a>
+      {% if page_index > 1 %}
+      <a href="{% url 'list' %}?search={{ is_search }}&news_category={{ news_category }}&page_index={{ page_index|add:-1 }}"
+        class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme">第 {{ page_index|add:-1 }} 页</a>
+      {% endif %}
+      {% if page_index < page_count %} <a href="{% url 'list' %}?search={{ is_search }}&news_category={{ news_category }}&page_index={{ page_index|add:1 }}"
+        class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme">第 {{ page_index|add:1 }} 页</a>
+        {% endif %}
+        <a href="{% url 'list' %}?search={{ is_search }}&news_category={{ news_category }}&page_index={{ page_count }}"
+          class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme">尾页</a>
+    </div>
+  </div>
+  <form action="{% url 'list' %}" method="get">
+    <div class="mdui-col-xs-2">
+      <div class="mdui-textfield">
+        <label class="mdui-textfield-label">转到:</label>
+        <input class="mdui-textfield-input" type="text" name="page_index" value="{{ page_index }}">
+        <input type="hidden" name="news_category" value="{{ news_category }}">
+        <input type="hidden" name="search" value="{{ is_search }}">
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

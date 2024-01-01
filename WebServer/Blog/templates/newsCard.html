@@ -1,0 +1,19 @@
+<div class="mdui-col-xs-12" style="margin-top: 10px;">
+  <a href="/View/{{ news_item.document_id }}">
+    <div class="mdui-card">
+      <div class="mdui-card-content mdui-row">
+        <div class="mdui-col-xs-12 mdui-typo-title">{{ news_item.title }}</div>
+        <div class="mdui-col-xs-12 mdui-typo-subheading-opacity">{{ news_item.summary|truncatechars:45 }}</div>
+        <div class="mdui-col-xs-6 mdui-typo-body-1">
+          {% if news_item.author != None and news_item.author != '' %}
+            作者: {{ news_item.author }}
+          {% endif %}
+          {% if news_item.media_name != None and news_item.media_name != '' %}
+            于媒体: {{ news_item.media_name }}
+          {% endif %}
+        </div>
+        <div class="mdui-col-xs-6 mdui-typo-body-1 mdui-text-right">创建于{{ news_item.created_time }}, {{ news_item.comment_count }}评论</div>
+      </div>
+    </div>
+  </a>
+</div>

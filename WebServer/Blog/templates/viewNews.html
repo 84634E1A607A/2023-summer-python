@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="mdui-container mdui-row">
+    <div class="mdui-col-xs-12 mdui-typo">
+      <h1>{{ news.title }}</h1>
+      <summary>
+        <p>摘要: {{ news.summary }}</p>
+      </summary>
+      <p class="mdui-text-color-grey-600">
+        {% if news.author != None and news.author != '' %}
+          由 {{ news.author }}
+          {% elif news.media_name != None and news.media_name != '' %}由 {{ news.media_name }}
+        {% endif %}于 {{ news.created_time }} 发布
+      </p>
+
+      {% if news.tags != None and news.tags != '' %}
+        <p class="mdui-text-color-grey-600">标签: {{ news.tags }}</p>
+      {% endif %}
+
+      <p class="mdui-text-color-grey-600">分类: <a href="{% url 'list' %}?news_category={{ news.category }}"> {{ news.category_name }}</a></p>
+
+      <hr />
+
+      {% autoescape off %}
+        {{ news.content }}
+      {% endautoescape %}
+
+      <p class="mdui-text-color-grey-600" style="margin-top: 30px;">
+        原文链接:
+        <a href="{{ news.source_url }}" target="_blank">{{ news.source_url }}</a>
+      </p>
+      <hr />
+    </div>
+    <div class="mdui-col-xs-12" style="margin-top: 50px;">
+      <div class="mdui-typo">
+        <h3>评论 {{ news.comment_count }}</h3>
+
+        {% for comment in news.comments %}
+          <hr />
+          <p>{{ comment.content }}</p>
+          <p class="mdui-text-color-grey-600">
+            由 {{ comment.user }} 于 {{ comment.created_time }} 发布
+            <span style="float: right;">
+                <a href="javascript:void(0)" onclick="delete_comment({{ comment.id }})">删除</a>
+            </span>
+          </p>
+        {% endfor %}
+
+        <script type="text/javascript">
+          function delete_comment(id) {
+            $.ajax({
+              url: '/Comment',
+              type: 'delete',
+              data: {
+                id: id,
+              },
+              headers: {
+                "X-CSRFToken": $('input[name="csrfmiddlewaretoken"]').val()
+              },
+              success: function (data) {
+                if (data.status == 'success') {
+                  mdui.snackbar({
+                    message: '删除成功',
+                    position: 'right-top'
+                  })
+                  setTimeout(function () {
+                    window.location.reload()
+                  }, 1000)
+                } else {
+                  mdui.snackbar({
+                    message: '删除失败',
+                    position: 'right-top'
+                  })
+                }
+              }
+            })
+          }
+        </script>
+      </div>
+    </div>
+    <div class="mdui-col-xs-12">
+      <div class="mdui-typo">
+        <h3>发表评论</h3>
+      </div>
+      <form id="comment" action="/Comment" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="document_id" value="{{ news.document_id }}" />
+        <div class="mdui-row">
+          <div class="mdui-col-xs-12 mdui-textfield">
+            <label class="mdui-textfield-label" for="user">昵称</label>
+            <input class="mdui-textfield-input" type="text" name="user" />
+          </div>
+          <div class="mdui-col-xs-12 mdui-textfield">
+            <label class="mdui-textfield-label" for="content">评论内容</label>
+            <textarea class="mdui-textfield-input" name="content" rows="3"></textarea>
+          </div>
+          <button class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme">评论</button>
+        </div>
+      </form>
+      <script type="text/javascript">
+        $(function () {
+          $('#comment').submit(function () {
+            $.ajax({
+              url: '/Comment',
+              type: 'post',
+              data: {
+                document_id: $('input[name="document_id"]').val(),
+                user: $('input[name="user"]').val(),
+                content: $('textarea[name="content"]').val(),
+                csrfmiddlewaretoken: $('input[name="csrfmiddlewaretoken"]').val()
+              },
+              success: function (data) {
+                if (data.status == 'success') {
+                  mdui.snackbar({
+                    message: '评论成功',
+                    position: 'right-top'
+                  })
+                  setTimeout(function () {
+                    window.location.reload()
+                  }, 1000)
+                } else {
+                  mdui.snackbar({
+                    message: '评论失败',
+                    position: 'right-top'
+                  })
+                }
+              }
+            })
+            return false
+          })
+        })
+      </script>
+    </div>
+  </div>
+{% endblock %}

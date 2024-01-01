@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mdui-container mdui-row">
+    {% for category in categories %}
+    <div class="mdui-col-xs-12" style="margin-top: 30px;">
+        <a href="{% url 'list' %}?news_category={{ category.id }}">
+            <div class="mdui-card">
+                <div class="mdui-card-content mdui-row">
+                    <div class="mdui-col-xs-6">
+                      {{ category.category }}
+                    </div>
+                    <div class="mdui-col-xs-6 mdui-text-right">
+                      共 {{ category.news_count }} 篇
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock content %}

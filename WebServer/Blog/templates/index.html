@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+  <div class="mdui-container mdui-row">
+    <div class="mdui-col-xs-12">
+      {% include 'searchCard.html' %}
+    </div>
+
+    <div class="mdui-col-xs-9" style="margin-top: 20px;">
+      <h2>新闻推荐:</h2>
+    </div>
+
+    <div class="mdui-col-xs-3 mdui-text-right" style="margin-top: 35px;">
+      <button class="mdui-btn mdui-btn-icon mdui-ripple" onclick="location.reload();">
+        <i class="mdui-icon material-icons">refresh</i>
+      </button>
+    </div>
+
+    {% for news_item in news_items %}
+      {% include 'newsCard.html' %} 
+    {% endfor %}
+  </div>
+{% endblock %}

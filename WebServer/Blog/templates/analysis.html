@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Code Hightlight CSS -->
+<link rel="stylesheet" href="static/highlight/highlight.css">
+
+<div class="mdui-container">
+<div class="mdui-typo">
+
+<!-- Generated Markdown HTML Begins Here -->
+
+<h1 id="数据分析">数据分析</h1>
+<h2 id="词频分析">词频分析</h2>
+<h3 id="全部内容">全部内容</h3>
+<p>首先我对所有新闻内容进行了分词, 并对词频进行了分析.</p>
+<p>分词的 python 脚本位于 <code>./KeywordAnalyser.py</code>.</p>
+<p>用 wordcloud 包建立了词云, 代码如下:</p>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> wordcloud <span class="hljs-keyword">import</span> WordCloud
+<span class="hljs-keyword">import</span> sqlite3
+<span class="hljs-keyword">import</span> re
+<span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
+
+PureSymbolRe = re.<span class="hljs-built_in">compile</span>(<span class="hljs-string">&#x27;&#x27;</span>)
+
+tags = {}
+conn = sqlite3.connect(<span class="hljs-string">&#x27;newsInfo.db&#x27;</span>)
+cursor = conn.execute(<span class="hljs-string">&quot;SELECT * FROM (SELECT word, SUM(count) AS cnt FROM words GROUP BY word)t ORDER BY cnt DESC&quot;</span>)
+
+<span class="hljs-keyword">for</span> row <span class="hljs-keyword">in</span> cursor:
+    <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(row[<span class="hljs-number">0</span>]) &gt; <span class="hljs-number">1</span>:
+        tags[row[<span class="hljs-number">0</span>]] = row[<span class="hljs-number">1</span>]
+
+font_path = <span class="hljs-string">&#x27;C:/Windows/Fonts/msyh.ttc&#x27;</span>
+wordcloud = WordCloud(font_path=font_path, width=<span class="hljs-number">1000</span>, height=<span class="hljs-number">1000</span>, max_words=<span class="hljs-number">100</span>, background_color=<span class="hljs-string">&#x27;white&#x27;</span>).generate_from_frequencies(tags)
+
+plt.figure(figsize=(<span class="hljs-number">10</span>, <span class="hljs-number">10</span>))
+plt.imshow(wordcloud)
+plt.axis(<span class="hljs-string">&quot;off&quot;</span>)
+plt.show()
+
+</code></pre>
+<p>得到的词云如下:</p>
+<p><img src="/static\analysis\word_cloud.png" alt="词云"></p>
+<p>可以看出, <strong>产品 / 市场 / 用户 / 公司 这些与商品的生产流通分不开的词汇是频率最高的词汇</strong>; 由于我爬虫爬取的分区中有 &quot;苹果&quot; 分区, 故在所有的词汇中, &quot;苹果&quot; &quot;iPhone&quot; 出现的频率很高.</p>
+<p>由于停用词列表有缺漏, &quot;一个&quot; 这一通用数量词没有被正确过滤, 出现频率很高.</p>
+<h3 id="近期内容">近期内容</h3>
+<p>将时间拉近到近一个月, 用类似的方法我们得到了另一张词云:</p>
+<p><img src="/static\analysis\word_cloud_august.png" alt="8月词云"></p>
+<p>由于8月是公司二季报和半年报发布的时间, 8月的<strong>科技新闻很多与科技公司的上半年营收和行业前景展望相关</strong>; 同时可以看出, <strong>新浪将与科技企业的相关的财经新闻归类为科技新闻</strong>.</p>
+<h2 id="文章情感分析">文章情感分析</h2>
+<p>使用 cemotion 库进行了对部分主题文章的情感分析.</p>
+<p>由于爬取的数据包含较多苹果区的文本, 我对以 iPhone 为标题的文章进行了情感分析:</p>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> cemotion <span class="hljs-keyword">import</span> Cemotion
+<span class="hljs-keyword">import</span> sqlite3
+<span class="hljs-keyword">import</span> pandas <span class="hljs-keyword">as</span> pd
+<span class="hljs-keyword">import</span> re
+
+ImagePlaceholderRe = re.<span class="hljs-built_in">compile</span>(<span class="hljs-string">r&#x27;&lt;_IMAGE_\d+_.*?_/&gt;&#x27;</span>)
+
+c = Cemotion()
+
+dbconn = sqlite3.connect(<span class="hljs-string">&#x27;newsInfo.db&#x27;</span>)
+news = pd.DataFrame(
+    dbconn.execute(<span class="hljs-string">&#x27;SELECT news.title, contents.content, news.created_at FROM news LEFT JOIN contents ON news.docid = contents.docid WHERE title LIKE &quot;%%iPhone%%&quot; ORDER BY created_at ASC&#x27;</span>).fetchall(),
+    columns=[<span class="hljs-string">&#x27;title&#x27;</span>, <span class="hljs-string">&#x27;content&#x27;</span>, <span class="hljs-string">&#x27;created_at&#x27;</span>],
+).dropna()
+news[<span class="hljs-string">&#x27;created_at&#x27;</span>] = pd.to_datetime(news[<span class="hljs-string">&#x27;created_at&#x27;</span>], unit=<span class="hljs-string">&#x27;s&#x27;</span>)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">ParseNewsContent</span>(<span class="hljs-params">content: <span class="hljs-built_in">str</span></span>) -&gt; <span class="hljs-built_in">list</span>[<span class="hljs-built_in">str</span>]:
+    <span class="hljs-comment"># Remove image placeholders</span>
+    ImagePlaceholderRe.sub(<span class="hljs-string">&#x27;&#x27;</span>, content)
+
+    <span class="hljs-comment"># The first line is always ads or author or sth unimportant</span>
+    content = content.splitlines()[<span class="hljs-number">1</span>:]
+
+    <span class="hljs-comment"># Strip all lines and remove lines too short</span>
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-built_in">len</span>(content)):
+        content[i] = content[i].strip()
+    
+    content = <span class="hljs-built_in">list</span>(<span class="hljs-built_in">filter</span>(<span class="hljs-keyword">lambda</span> x: <span class="hljs-built_in">len</span>(x) &gt; <span class="hljs-number">5</span>, content))
+    <span class="hljs-keyword">return</span> content
+
+news[<span class="hljs-string">&#x27;content&#x27;</span>] = news[<span class="hljs-string">&#x27;content&#x27;</span>].apply(ParseNewsContent)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">GetPrediction</span>(<span class="hljs-params">data</span>) -&gt; <span class="hljs-built_in">float</span>:
+    title_emotion = c.predict(data[<span class="hljs-string">&#x27;title&#x27;</span>])
+    content_emotion = c.predict(<span class="hljs-string">&#x27; &#x27;</span>.join(data[<span class="hljs-string">&#x27;content&#x27;</span>]))
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&#x27;Parsed <span class="hljs-subst">{data[<span class="hljs-string">&quot;title&quot;</span>]}</span>: <span class="hljs-subst">{title_emotion}</span> <span class="hljs-subst">{content_emotion}</span>&#x27;</span>)
+    <span class="hljs-keyword">return</span> title_emotion * <span class="hljs-number">0.4</span> + content_emotion * <span class="hljs-number">0.6</span>
+
+
+news[<span class="hljs-string">&#x27;emotion&#x27;</span>] = news.apply(GetPrediction, axis=<span class="hljs-number">1</span>)
+
+<span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">from</span> sklearn.linear_model <span class="hljs-keyword">import</span> LinearRegression
+
+font = {<span class="hljs-string">&#x27;fontname&#x27;</span>: <span class="hljs-string">&#x27;Microsoft YaHei&#x27;</span>}
+
+timestamp = np.array(news[<span class="hljs-string">&#x27;created_at&#x27;</span>].apply(<span class="hljs-keyword">lambda</span> x: x.timestamp())).reshape(-<span class="hljs-number">1</span>, <span class="hljs-number">1</span>)
+model = LinearRegression().fit(X=timestamp, y=np.array(news[<span class="hljs-string">&#x27;emotion&#x27;</span>]).reshape(-<span class="hljs-number">1</span>, <span class="hljs-number">1</span>))
+
+image = plt.figure(figsize=(<span class="hljs-number">8</span>, <span class="hljs-number">6</span>))
+plt.scatter(news[<span class="hljs-string">&#x27;created_at&#x27;</span>], news[<span class="hljs-string">&#x27;emotion&#x27;</span>])
+plt.plot(news[<span class="hljs-string">&#x27;created_at&#x27;</span>], model.predict(timestamp), color=<span class="hljs-string">&#x27;r&#x27;</span>)
+plt.xlabel(<span class="hljs-string">&#x27;时间&#x27;</span>, font)
+plt.ylabel(<span class="hljs-string">&#x27;情感值&#x27;</span>, font)
+plt.title(<span class="hljs-string">&#x27;iPhone情感值散点图&#x27;</span>, font)
+plt.axhline(y=np.average(news[<span class="hljs-string">&#x27;emotion&#x27;</span>]), color=<span class="hljs-string">&#x27;g&#x27;</span>, linestyle=<span class="hljs-string">&#x27;--&#x27;</span>)
+plt.show()
+
+</code></pre>
+<p>得到散点图如下:</p>
+<p><img src="/static\analysis\iphone_emotion.png" alt="iPhone 评价图"></p>
+<p>从散点图的数据集中性来看, 2022年9月的苹果发布会前后是对iPhone报道最集中的时间. 对每篇文章以标题0.4, 内容0.6的权重得到情感分数后, 从趋势线可以看出苹果在内地的口碑有下滑的趋势, 且平均值较低.</p>
+<p>作为对比 (夹带私货), 我把关键词换成华为以同样的方式得到了一幅图:</p>
+<p><img src="/static\analysis\huawei_emotion.png" alt="华为 评价图"></p>
+<p>可以看到, 新浪科技对华为的评价整体好于苹果, 且评价呈现微小的上升趋势.</p>
+<p>但由于在 iPhone 评价图中 2022 年 7 月后的数据比之前要显著密集, 我检查了爬取的数据集, 发现 2022 年 7 月后的是从 &quot;苹果汇&quot; 子栏目按照页数爬取的, 该 API 到 2022 年 7 月时失效, 不再返回更早的内容. 因此, 我重新定位了按照结束时间排序的 &quot;iPhone&quot; 子区的 API <code>https://feed.sina.com.cn/api/roll/get?pageid=217&amp;lid=1810&amp;num=50&amp;versionNumber=1.2.4&amp;ctime={starttime}&amp;encode=utf-8</code> 进行了爬取, 将爬取的时间拓展到 2020 年 9 月.</p>
+<p>数据处理的过程类似, 绘图部分的代码如下:</p>
+<pre><code class="language-python"><span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">from</span> sklearn.linear_model <span class="hljs-keyword">import</span> LinearRegression
+<span class="hljs-keyword">import</span> datetime
+
+font = {<span class="hljs-string">&#x27;fontname&#x27;</span>: <span class="hljs-string">&#x27;Microsoft YaHei&#x27;</span>}
+
+timestamp = np.array(news[<span class="hljs-string">&#x27;created_at&#x27;</span>].apply(<span class="hljs-keyword">lambda</span> x: x.timestamp())).reshape(-<span class="hljs-number">1</span>, <span class="hljs-number">1</span>)
+model = LinearRegression().fit(X=timestamp, y=np.array(news[<span class="hljs-string">&#x27;emotion&#x27;</span>]).reshape(-<span class="hljs-number">1</span>, <span class="hljs-number">1</span>))
+
+image = plt.figure(figsize=(<span class="hljs-number">8</span>, <span class="hljs-number">6</span>))
+plt.scatter(news[<span class="hljs-string">&#x27;created_at&#x27;</span>], news[<span class="hljs-string">&#x27;emotion&#x27;</span>], s=<span class="hljs-number">1</span>)
+plt.plot(news[<span class="hljs-string">&#x27;created_at&#x27;</span>], model.predict(timestamp), color=<span class="hljs-string">&#x27;r&#x27;</span>)
+plt.xlabel(<span class="hljs-string">&#x27;时间&#x27;</span>, font)
+plt.ylabel(<span class="hljs-string">&#x27;情感值&#x27;</span>, font)
+plt.title(<span class="hljs-string">&#x27;iPhone 情感值散点图数据补齐版&#x27;</span>, font)
+plt.axhline(y=np.average(news[<span class="hljs-string">&#x27;emotion&#x27;</span>]), color=<span class="hljs-string">&#x27;g&#x27;</span>, linestyle=<span class="hljs-string">&#x27;--&#x27;</span>)
+plt.axvline(x=datetime.datetime(<span class="hljs-number">2020</span>, <span class="hljs-number">10</span>, <span class="hljs-number">14</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>), color=<span class="hljs-string">&#x27;#00800040&#x27;</span>, linestyle=<span class="hljs-string">&#x27;-&#x27;</span>)
+plt.text(datetime.datetime(<span class="hljs-number">2020</span>, <span class="hljs-number">10</span>, <span class="hljs-number">14</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>), -<span class="hljs-number">0.03</span>, <span class="hljs-string">&#x27;iPhone 12&#x27;</span>, font)
+plt.axvline(x=datetime.datetime(<span class="hljs-number">2021</span>, <span class="hljs-number">9</span>, <span class="hljs-number">14</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>), color=<span class="hljs-string">&#x27;#00800040&#x27;</span>, linestyle=<span class="hljs-string">&#x27;-&#x27;</span>)
+plt.text(datetime.datetime(<span class="hljs-number">2021</span>, <span class="hljs-number">9</span>, <span class="hljs-number">14</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>), -<span class="hljs-number">0.03</span>, <span class="hljs-string">&#x27;iPhone 13&#x27;</span>, font)
+plt.axvline(x=datetime.datetime(<span class="hljs-number">2022</span>, <span class="hljs-number">9</span>, <span class="hljs-number">8</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>), color=<span class="hljs-string">&#x27;#00800040&#x27;</span>, linestyle=<span class="hljs-string">&#x27;-&#x27;</span>)
+plt.text(datetime.datetime(<span class="hljs-number">2022</span>, <span class="hljs-number">9</span>, <span class="hljs-number">8</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>), -<span class="hljs-number">0.03</span>, <span class="hljs-string">&#x27;iPhone 14&#x27;</span>, font)
+plt.show()
+
+</code></pre>
+<p>得到的新散点图如下:</p>
+<p><img src="/static\analysis\iphone_emotion_full_data.png" alt="iPhone 评价图数据补全"></p>
+<p>我将苹果三年发布会的时间以竖线的形式叠加在了图表上. 可以清楚观察到, <strong>每到发布会前夕, 与 iPhone 有关的新闻数量增加, 毁誉参半</strong>. 这与科技区追求新兴科技, 追求拿到 &quot;首发评测&quot; 等来获得流量是吻合的. 同时可以看到, 近期 iPhone 有关的内容又多了起来, 我预期这与即将于 2023 年 9 月 13 日到来的 iPhone 15 发布会有密切关系.</p>
+<p>但是, 尽管补全了数据, 对 iPhone 的评价倾向 (线性回归) 依然是负面 (b &lt; 0) 的.</p>
+<p>此外, 我们注意到在 <code>y=0.6</code> 处有一条数据点较为密集的区域. 通过分析代码执行的中间结果, 这是由于 <code>cemotion</code> 库将部分中立的标题错误判断为负面而内容判断为正面, 经过赋权导致的. 因此, 我将标题的权重去除, 得到了另一幅散点图:</p>
+<p><img src="/static\analysis\iphone_emotion_full_data_content_only.png" alt="iPhone 评价图数据补全仅内容"></p>
+<p>图示包含的信息与上一张图无异, 不再过多赘述.</p>
+<h2 id="关注程度">关注程度</h2>
+<p>我们对 <strong>2023 年以来</strong> 新浪科技对包括 汽车 (燃油车, 电动车等), 电脑 (笔记本, 台式机组件等), 手机, 物联网设备, 人工智能 等类型的关注度 (涉及到的文章占所有文章占比) 进行了统计:</p>
+<pre><code class="language-python"><span class="hljs-keyword">import</span> sqlite3
+<span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+
+StartTimestamp = <span class="hljs-number">1672531200</span>
+
+dbconn = sqlite3.connect(<span class="hljs-string">&#x27;newsInfo.db&#x27;</span>)
+
+news = dbconn.execute(<span class="hljs-string">f&#x27;SELECT news.docid, news.title, news.created_at FROM news LEFT JOIN contents ON news.docid = contents.docid WHERE news.created_at &gt;= <span class="hljs-subst">{StartTimestamp}</span> ORDER BY created_at ASC&#x27;</span>).fetchall()
+
+car_keyword = [<span class="hljs-string">&quot;汽车&quot;</span>, <span class="hljs-string">&quot;燃油车&quot;</span>, <span class="hljs-string">&quot;电动车&quot;</span>, <span class="hljs-string">&quot;电动汽车&quot;</span>, <span class="hljs-string">&quot;燃油&quot;</span>]
+pc_keyword = [<span class="hljs-string">&quot;CPU&quot;</span>, <span class="hljs-string">&quot;笔记本&quot;</span>, <span class="hljs-string">&quot;电脑&quot;</span>, <span class="hljs-string">&quot;主机&quot;</span>, <span class="hljs-string">&quot;显卡&quot;</span>, <span class="hljs-string">&quot;GPU&quot;</span>]
+game_keyword = [<span class="hljs-string">&quot;游戏&quot;</span>, <span class="hljs-string">&quot;游戏机&quot;</span>, <span class="hljs-string">&quot;游戏主机&quot;</span>]
+mobile_keyword = [<span class="hljs-string">&quot;手机&quot;</span>, <span class="hljs-string">&quot;平板&quot;</span>]
+web_keyword = [<span class="hljs-string">&quot;网站&quot;</span>, <span class="hljs-string">&quot;网页&quot;</span>, <span class="hljs-string">&quot;互联网&quot;</span>, <span class="hljs-string">&quot;TCP&quot;</span>, <span class="hljs-string">&quot;UDP&quot;</span>, <span class="hljs-string">&quot;运营商&quot;</span>, <span class="hljs-string">&quot;路由器&quot;</span>, <span class="hljs-string">&quot;交换机&quot;</span>]
+iot_keyword = [<span class="hljs-string">&quot;物联网&quot;</span>, <span class="hljs-string">&quot;智能家居&quot;</span>, <span class="hljs-string">&quot;智能穿戴&quot;</span>, <span class="hljs-string">&quot;XR&quot;</span>, <span class="hljs-string">&quot;AR&quot;</span>, <span class="hljs-string">&quot;VR&quot;</span>, <span class="hljs-string">&quot;智能手表&quot;</span>, <span class="hljs-string">&quot;Watch&quot;</span>, <span class="hljs-string">&quot;扫地机器人&quot;</span>]
+ai_keyword = [<span class="hljs-string">&quot;AI&quot;</span>, <span class="hljs-string">&quot;大模型&quot;</span>, <span class="hljs-string">&quot;人工智能&quot;</span>]
+os_keyword = [<span class="hljs-string">&quot;操作系统&quot;</span>, <span class="hljs-string">&quot;Windows&quot;</span>, <span class="hljs-string">&quot;Linux&quot;</span>, <span class="hljs-string">&quot;MacOS&quot;</span>, <span class="hljs-string">&quot;iOS&quot;</span>, <span class="hljs-string">&quot;Android&quot;</span>, <span class="hljs-string">&quot;HarmonyOS&quot;</span>, <span class="hljs-string">&quot;OS&quot;</span>]
+health_keyword = [<span class="hljs-string">&quot;医疗&quot;</span>, <span class="hljs-string">&quot;健康&quot;</span>, <span class="hljs-string">&quot;疫苗&quot;</span>, <span class="hljs-string">&quot;医学&quot;</span>]
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">GetCat</span>(<span class="hljs-params">cat: <span class="hljs-built_in">list</span>[<span class="hljs-built_in">str</span>]</span>):
+    cat = <span class="hljs-string">&#x27;,&#x27;</span>.join(<span class="hljs-string">f&#x27;&quot;<span class="hljs-subst">{x}</span>&quot;&#x27;</span> <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> cat)
+    <span class="hljs-comment"># print(f&#x27;SELECT news.docid FROM words LEFT JOIN news ON news.docid = words.docid WHERE word IN ({cat}) AND news.created_at &gt;= {StartTimestamp} GROUP BY news.docid&#x27;)</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">set</span>(i[<span class="hljs-number">0</span>] <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> dbconn.execute(<span class="hljs-string">f&#x27;SELECT news.docid FROM words LEFT JOIN news ON news.docid = words.docid WHERE word IN (<span class="hljs-subst">{cat}</span>) AND news.created_at &gt;= <span class="hljs-subst">{StartTimestamp}</span> GROUP BY news.docid&#x27;</span>))
+
+car_cat = GetCat(car_keyword)
+pc_cat = GetCat(pc_keyword)
+game_cat = GetCat(game_keyword)
+mobile_cat = GetCat(mobile_keyword)
+web_cat = GetCat(web_keyword)
+iot_cat = GetCat(iot_keyword)
+ai_cat = GetCat(ai_keyword)
+os_cat = GetCat(os_keyword)
+health_cat = GetCat(health_keyword)
+other_cat = <span class="hljs-built_in">set</span>(n[<span class="hljs-number">0</span>] <span class="hljs-keyword">for</span> n <span class="hljs-keyword">in</span> news) - car_cat - pc_cat - mobile_cat - game_cat - iot_cat - ai_cat - web_cat - health_cat - os_cat
+
+cat_names = [<span class="hljs-string">&#x27;汽车&#x27;</span>, <span class="hljs-string">&#x27;电脑&#x27;</span>, <span class="hljs-string">&#x27;游戏&#x27;</span>, <span class="hljs-string">&#x27;手机&#x27;</span>, <span class="hljs-string">&#x27;物联网&#x27;</span>, <span class="hljs-string">&#x27;AI&#x27;</span>, <span class="hljs-string">&#x27;互联网&#x27;</span>, <span class="hljs-string">&#x27;操作系统&#x27;</span>, <span class="hljs-string">&#x27;健康&#x27;</span>, <span class="hljs-string">&#x27;其他&#x27;</span>]
+cat_data = np.array([<span class="hljs-built_in">len</span>(car_cat), <span class="hljs-built_in">len</span>(pc_cat), <span class="hljs-built_in">len</span>(game_cat), <span class="hljs-built_in">len</span>(mobile_cat), <span class="hljs-built_in">len</span>(iot_cat), <span class="hljs-built_in">len</span>(ai_cat), <span class="hljs-built_in">len</span>(web_cat), <span class="hljs-built_in">len</span>(os_cat), <span class="hljs-built_in">len</span>(health_cat), <span class="hljs-built_in">len</span>(other_cat)]) / <span class="hljs-built_in">len</span>(news)
+
+<span class="hljs-keyword">import</span> matplotlib
+
+matplotlib.rcParams[<span class="hljs-string">&#x27;font.family&#x27;</span>] = <span class="hljs-string">&#x27;SimHei&#x27;</span>
+graph = plt.figure(figsize=(<span class="hljs-number">8</span>, <span class="hljs-number">6</span>))
+plt.bar(cat_names, cat_data)
+plt.xlabel(<span class="hljs-string">&#x27;分类&#x27;</span>, font)
+plt.ylabel(<span class="hljs-string">&#x27;新闻数量&#x27;</span>, font)
+plt.title(<span class="hljs-string">&#x27;新闻分类统计&#x27;</span>, font)
+plt.show()
+
+</code></pre>
+<p>由于文章与类型是多对多的关系, 故我使用了条形图进行展现:</p>
+<p><img src="/static\analysis\category_percentage.png" alt="新闻分类"></p>
+<p>可以看到, <strong>AI 确实是当今科技圈最关注的对象</strong>. 在爬取的 2023 年以来的新闻中, 提及 AI 的占比在 24% 左右. <strong>互联网也是科技圈关注的重点, 主要原因可能是其涉及面广泛</strong>. 新能源车由于其方兴未艾, 加上近期辅助驾驶 / 自动驾驶技术在人工智能等新技术的助力下蓬勃发展, 成为了与手机平起平坐的关注重点.</p>
+<p>由于个人分类水平有限, 同时也因为科技新闻的种类繁多, 互相交叉, 且网上无能够通过文章内容准确分辨文章主题的模型, 在短期内我也无法自行构建模型, 这些类别很可能无法包含全部内容, 且有的分类较广, 有的则较窄. 但总体上得到的结果是可以解释的, 符合情理的.</p>
+
+<!-- Generated Markdown HTML Ends Here -->
+
+</div>
+</div>
+{% endblock content %}

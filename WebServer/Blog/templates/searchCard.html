@@ -1,0 +1,36 @@
+<div class="mdui-card">
+  <form method="post" action="{% url 'search' %}">
+    {% csrf_token %}
+    <div class="mdui-card-content mdui-row">
+      <div class="mdui-textfield mdui-col-xs-9">
+        <label class="mdui-textfield-label" for="search">搜索内容</label>
+        <input class="mdui-textfield-input" type="text" placeholder="请输入搜索内容" id="search" name="search" />
+      </div>
+      <div class="mdui-textfield mdui-col-xs-3 mdui-text-right">
+        <button class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme" type="submit" style="margin-top: 20px">搜索</button>
+      </div>
+      <div class="mdui-textfield mdui-col-xs-6">
+        <label class="mdui-textfield-label" for="type">搜索范围</label>
+        <select class="mdui-select" id="search-type" name="type" style="background-color: transparent; width: 100%;" multiple>
+          {% for category in categories %}
+          <option value="{{ category.id }}" style="background: transparent; margin: 5px;">{{ category.category }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mdui-textfield mdui-col-xs-6">
+        <label class="mdui-textfield-label" for="sort">结果排序</label>
+        <select class="mdui-select" id="sort-type" name="sort" style="background-color: transparent; width: 100%;">
+          <option value="time">按时间排序（由新到旧）</option>
+          <option value="comments">按热度排序（由高到低）</option>
+        </select>
+      </div>
+      <div class="mdui-textfield mdui-col-xs-6">
+        <label class="mdui-textfield-label">搜索模式</label>
+        <select class="mdui-select" id="search-mode" name="mode" style="background-color: transparent; width: 100%;">
+          <option value="0">精确搜索</option>
+          <option value="1">关键词搜索</option>
+        </select>
+      </div>
+    </div>
+  </form>
+</div>
